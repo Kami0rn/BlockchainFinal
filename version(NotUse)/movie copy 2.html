@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Student Name in Blockchain Class</title>
+    <link rel="stylesheet" type="text/css" href="main.css" />
+    <!-- <script src="./node_modules/web3/dist/web3.min.js">
+    </script> -->
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.10.3/dist/web3.min.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <div class="listForSale">
+        <label class="col-lg-2 control-label">List Movie For Sale</label>
+        <h4 style="color: red">Fee : 0.0002 (eth) / list</h4>
+        <input id="movieTitle" type="text" placeholder="Movie Title" />
+        <input
+          id="moviePrice"
+          type="number"
+          placeholder="Movie Price (Ether)"
+        />
+        <button id="listMovieForSaleBtn">List For Sale</button>
+        <!-- <label class="col-lg-2 control-label">Status</label> -->
+        <h2 id="result"></h2>
+        Status: <span id="status">Loading...</span>
+      </div>
+      <div class="vl"></div>
+      <div id="movieContainer"></div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.slim.min.js"></script>
+    <script>
+      // ===Connecting to MetaMask===
+      function loadWeb3() {
+        if (window.ethereum) {
+          // To get web3(.js) object
+          web3 = new Web3(window.ethereum);
+
+          // To request user's account from Metamask
+          ethereum
+            .request({ method: "eth_requestAccounts" })
+            .then(handleAccountsChanged)
+            .catch((err) => {
+              if (err.code === 4001) {
+                // If this happens, the user rejected the connection request.
+                console.log("Please connect to MetaMask.");
+              } else {
+                console.error(err);
+              }
+            });
+        }
+      }
+
+      // ===Handle user accounts and accountsChanged===
+      let currentAccount = null;
+
+      // Note that this event is emitted on page load.
+      // If the array of accounts is non-empty, you're already connected.
+      window.ethereum.on("accountsChanged", handleAccountsChanged);
+
+      // For now, 'eth_accounts' will continue to always return an array
+      function handleAccountsChanged(accounts) {
+        if (accounts.length === 0) {
+          // MetaMask is locked or the user has not connected any accounts
+          console.log("Please connect to MetaMask.");
+        } else if (accounts[0] !== currentAccount) {
+          currentAccount = accounts[0];
+        }
+      }
+
+      let abi = [
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "movieHash",
+              type: "bytes32",
+            },
+          ],
+          name: "buyMovie",
+          outputs: [],
+          stateMutability: "payable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "movieTitle",
+              type: "string",
+            },
+          ],
+          name: "buyMovieByTitle",
+          outputs: [],
+          stateMutability: "payable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "movieTitle",
+              type: "string",
+            },
+            {
+              internalType: "uint256",
+              name: "priceInGwei",
+              type: "uint256",
+            },
+          ],
+          name: "listMovieForSale",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "seller",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "string",
+              name: "movieTitle",
+              type: "string",
+            },
+            {
+              indexed: false,
+              internalType: "bytes32",
+              name: "movieHash",
+              type: "bytes32",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          name: "ListUnsoldMovie",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: false,
+              internalType: "address",
+              name: "buyer",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "string",
+              name: "movieTitle",
+              type: "string",
+            },
+            {
+              indexed: false,
+              internalType: "bytes32",
+              name: "movieHash",
+              type: "bytes32",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+            {
+              indexed: false,
+              internalType: "address",
+              name: "seller",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "timestamp",
+              type: "uint256",
+            },
+          ],
+          name: "MovieBought",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: false,
+              internalType: "address",
+              name: "from",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "string",
+              name: "text",
+              type: "string",
+            },
+            {
+              indexed: false,
+              internalType: "bytes32",
+              name: "hash",
+              type: "bytes32",
+            },
+          ],
+          name: "NameAdded",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: false,
+              internalType: "address",
+              name: "from",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "string",
+              name: "text",
+              type: "string",
+            },
+            {
+              indexed: false,
+              internalType: "string",
+              name: "reason",
+              type: "string",
+            },
+          ],
+          name: "RegistrationError",
+          type: "event",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "name",
+              type: "string",
+            },
+          ],
+          name: "checkName",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "getListOfSoldMovieInfo",
+          outputs: [
+            {
+              internalType: "string[]",
+              name: "titles",
+              type: "string[]",
+            },
+            {
+              internalType: "address[]",
+              name: "owners",
+              type: "address[]",
+            },
+            {
+              internalType: "uint256[]",
+              name: "timestamps",
+              type: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "getListOfSoldMovies",
+          outputs: [
+            {
+              internalType: "bytes32[]",
+              name: "",
+              type: "bytes32[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "getListOfUnsoldMovieInfoWithTitles",
+          outputs: [
+            {
+              internalType: "string[]",
+              name: "titles",
+              type: "string[]",
+            },
+            {
+              internalType: "address[]",
+              name: "sellers",
+              type: "address[]",
+            },
+            {
+              internalType: "uint256[]",
+              name: "prices",
+              type: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "getListOfUnsoldMovies",
+          outputs: [
+            {
+              internalType: "bytes32[]",
+              name: "",
+              type: "bytes32[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "movieHash",
+              type: "bytes32",
+            },
+          ],
+          name: "getSoldMovieInfo",
+          outputs: [
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "timestamp",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "movieHash",
+              type: "bytes32",
+            },
+          ],
+          name: "getSoldMovieInfoWithTitles",
+          outputs: [
+            {
+              internalType: "string",
+              name: "title",
+              type: "string",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "timestamp",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ]; // version 3
+
+      async function loadContract() {
+        return await new web3.eth.Contract(
+          abi,
+          "0x59ECb3deB6FD38DEE148FBB2Bd9cf29698863b7F"
+        ); // version 3
+      }
+
+      async function load() {
+        await loadWeb3();
+        web3.contract = await loadContract();
+        updateStatus("Ready!");
+
+        try {
+          const getListOfUnsoldMovieInfoWithTitles = await web3.contract.methods
+            .getListOfUnsoldMovieInfoWithTitles()
+            .call();
+
+          console.log("Unsold Movies:", getListOfUnsoldMovieInfoWithTitles);
+
+          const movieContainer = document.getElementById("movieContainer");
+
+          if (getListOfUnsoldMovieInfoWithTitles.titles.length === 0) {
+            movieContainer.innerHTML = "<p>No unsold movies available.</p>";
+          } else {
+            for (
+              let i = 0;
+              i < getListOfUnsoldMovieInfoWithTitles.titles.length;
+              i++
+            ) {
+              generateMovieCard(
+                getListOfUnsoldMovieInfoWithTitles.titles[i],
+                getListOfUnsoldMovieInfoWithTitles.sellers[i],
+                getListOfUnsoldMovieInfoWithTitles.prices[i]
+              );
+            }
+          }
+        } catch (error) {
+          console.error("Error loading data:", error);
+        }
+      }
+
+      function generateMovieCard(title, seller, price) {
+        const movieContainer = document.getElementById("movieContainer");
+
+        const card = document.createElement("div");
+        card.className = "card-movie2";
+
+        const titleLabel = document.createElement("label");
+        titleLabel.className = "col-lg-2 control-label";
+        titleLabel.textContent = title;
+
+        const img = document.createElement("img");
+        img.src = "image/" + title.toLowerCase() + ".jpg";
+        img.alt = title + " Image";
+        img.style.width = "200px";
+
+        const priceLabel = document.createElement("label");
+
+        const priceInEther = parseFloat(price) / Math.pow(10, 18);
+
+        priceLabel.textContent = "Price: " + priceInEther + " Gwei";
+
+        const buyButton = document.createElement("button");
+        buyButton.textContent = "Buy";
+        buyButton.addEventListener("click", function () {
+          handleBuy(title, price);
+        });
+
+        card.appendChild(titleLabel);
+        card.appendChild(img);
+        card.appendChild(priceLabel);
+        card.appendChild(buyButton);
+
+        movieContainer.appendChild(card);
+      }
+
+      function updateStatus(status) {
+        const statusEl = document.getElementById("status");
+        statusEl.innerHTML = status;
+        console.log(status);
+      }
+
+      $("#listMovieForSaleBtn").click(function () {
+        console.log(currentAccount);
+        const movieTitle = $("#movieTitle").val();
+        const moviePrice = $("#moviePrice").val();
+
+        // Call the listMovieForSale function
+        web3.contract.methods
+          .listMovieForSale(movieTitle, web3.utils.toWei(moviePrice, "ether"))
+          .send({ from: currentAccount }, function (error, result) {
+            $("#result").html(result);
+          });
+
+        // Listen for events or handle the result as needed
+        // (Similar to how you did for MovieAdded and RegistrationError)
+      });
+
+      $("#sellMovieBtn").click(function () {
+        console.log(currentAccount);
+        web3.contract.methods.registration($("#document1").val()).send(
+          {
+            from: currentAccount,
+            value: web3.utils.toWei("0.0002", "ether"),
+          },
+          function (error, result) {
+            $("#result").html(result);
+          }
+        );
+        web3.contract.once("MovieAdded", {}, function (error, event) {
+          if (!error) {
+            console.log(event);
+            $("#result").html(
+              "Name: " +
+                event.returnValues.text +
+                "<br/>=> Hashed as: " +
+                event.returnValues.hash
+            );
+          }
+        });
+        web3.contract.once("RegistrationError", {}, function (error, event) {
+          if (!error) {
+            console.log(event);
+            $("#result").html(
+              "Error: " +
+                event.returnValues.text +
+                "<br/>Reason: " +
+                event.returnValues.reason
+            );
+          }
+        });
+      });
+
+      load();
+    </script>
+  </body>
+</html>
